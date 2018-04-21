@@ -153,7 +153,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
-    init = tf.global_variable_initializer()
+    init = tf.global_variables_initializer()
 
     with tf.Session() as run_sess:
         run_sess.run(init)
