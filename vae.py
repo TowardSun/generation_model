@@ -23,17 +23,17 @@ mnist = input_data.read_data_sets('/tmp/data/', one_hot=True)
 
 
 def glorot_init(shape):
-    return tf.random_normal(shape=shape, stddev=1.0 / tf.sqrt(shape[0] / 2))
+    return tf.random_normal(shape=shape, stddev=1. / tf.sqrt(shape[0] / 2.))
 
 
 class VAE:
 
-    def __init__(self, image_dim, hidden_dim, latent_dim, sess, lr=0.001, batch_size=64, num_steps=30000):
+    def __init__(self, image_dim, hidden_dim, latent_dim, lr=0.001, batch_size=64, num_steps=30000):
         self.image_dim = image_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-        self.sess = sess
         self.lr = lr
+        self.sess = None
         self.batch_size = batch_size
         self.num_steps = num_steps
 
@@ -41,21 +41,23 @@ class VAE:
         self._build_model()
         self._build_decoder_model()
 
+    def set_sess(self, sess):
+        self.sess = sess
+
     def _init_weights(self):
         self.weights = {
-            'encoder_h1': tf.Variable(glorot_init([self.image_dim, self.hidden_dim])),
-            'z_mean': tf.Variable(glorot_init([self.hidden_dim, self.latent_dim])),
-            'z_std': tf.Variable(glorot_init([self.hidden_dim, self.latent_dim])),
-            'decoder_h1': tf.Variable(glorot_init([self.latent_dim, self.hidden_dim])),
-            'decoder_out': tf.Variable(glorot_init([self.hidden_dim, self.image_dim]))
+            'encoder_h1': tf.Variable(glorot_init([self.image_dim, self.hidden_dim]), name='w_encoder_h1'),
+            'z_mean': tf.Variable(glorot_init([self.hidden_dim, self.latent_dim]), name='w_z_mean'),
+            'z_std': tf.Variable(glorot_init([self.hidden_dim, self.latent_dim]), name='w_z_std'),
+            'decoder_h1': tf.Variable(glorot_init([self.latent_dim, self.hidden_dim]), name='w_decoder_h1'),
+            'decoder_out': tf.Variable(glorot_init([self.hidden_dim, self.image_dim]), name='w_decoder_out')
         }
-
         self.bias = {
-            'encoder_b1': tf.Variable(glorot_init([self.hidden_dim])),
-            'z_mean': tf.Variable(glorot_init([self.latent_dim])),
-            'z_std': tf.Variable(glorot_init([self.latent_dim])),
-            'decoder_b1': tf.Variable(glorot_init([self.hidden_dim])),
-            'decoder_out': tf.Variable(glorot_init([self.image_dim]))
+            'encoder_b1': tf.Variable(glorot_init([self.hidden_dim]), name='b_encoder_b1'),
+            'z_mean': tf.Variable(glorot_init([self.latent_dim]), name='b_z_mean'),
+            'z_std': tf.Variable(glorot_init([self.latent_dim]), name='b_z_std'),
+            'decoder_b1': tf.Variable(glorot_init([self.hidden_dim]), name='b_decoder_b1'),
+            'decoder_out': tf.Variable(glorot_init([self.image_dim]), name='b_decoder_out')
         }
 
     def _build_model(self):
@@ -111,8 +113,8 @@ class VAE:
 
             if i % 1000 == 0:
                 batch_x, _ = mnist.test.next_batch(self.batch_size)
-                l = self.sess.run([self.loss], feed_dict={self.input_image: batch_x})
-                logger.info('Step %i, test loss: %f' % (i, l))
+                l = self.sess.run(self.loss, feed_dict={self.input_image: batch_x})
+                logger.info('\nStep %i, test evaluation loss: %f\n' % (i, l))
 
     def test(self, n=20):
         x_axis = np.linspace(-3, 3, n)
@@ -148,19 +150,22 @@ if __name__ == '__main__':
     parser.add_argument('--latent_dim', default=2, type=int, help='latent variable dimension')
     parser.add_argument('--learning_rate', default=0.001, type=float)
     parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--num_steps', default=30000, type=int)
     parser.add_argument('--gpu', default=0, type=int)
 
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
 
-    init = tf.global_variables_initializer()
+    vae_model = VAE(
+        args.image_dim, args.hidden_dim, args.latent_dim, lr=args.learning_rate,
+        batch_size=args.batch_size, num_steps=args.num_steps
+    )
 
-    with tf.Session() as run_sess:
-        run_sess.run(init)
-        vae_model = VAE(
-            args.image_dim, args.hidden_dim, args.latent_dim, run_sess, lr=args.learning_rate,
-            batch_size=args.batch_size
-        )
+    with tf.Session(config=config) as run_sess:
+        run_sess.run(tf.global_variables_initializer())
+        vae_model.set_sess(run_sess)
 
         vae_model.train()
         vae_model.test()
