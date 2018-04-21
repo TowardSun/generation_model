@@ -23,7 +23,7 @@ mnist = input_data.read_data_sets('/tmp/data/', one_hot=True)
 
 
 def glorot_init(shape):
-    return tf.trandom_normal(shape=shape, stddev=1.0 / tf.sqrt(shape[0] / 2))
+    return tf.random_normal(shape=shape, stddev=1.0 / tf.sqrt(shape[0] / 2))
 
 
 class VAE:
@@ -85,7 +85,7 @@ class VAE:
     def _build_decoder_model(self):
         self.noise_input = tf.placeholder(tf.float32, shape=[None, self.latent_dim])
         decoder = tf.matmul(self.noise_input, self.weights['decoder_h1']) + self.bias['decoder_b1']
-        decoder = tf.nn_tanh(decoder)
+        decoder = tf.nn.tanh(decoder)
         decoder = tf.matmul(decoder, self.weights['decoder_out']) + self.bias['decoder_out']
         self.gen_output = tf.nn.sigmoid(decoder)
 
